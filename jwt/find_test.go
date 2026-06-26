@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,85 @@ func TestFindNone(t *testing.T) {
 	}
 }
 
+func TestFindRelaxedIsSupersetOfFind(t *testing.T) {
+	// A well-formed JWT must be reported once, identically to strict Find — not
+	// split into its header and payload segments.
+	tok := makeJWT(defaultHeader(), map[string]any{"iss": "acme", "sub": "u1"})
+	blob := "Bearer " + tok + " end"
+
+	relaxed := FindRelaxed("x", []byte(blob))
+	if len(relaxed) != 1 {
+		t.Fatalf("relaxed found %d, want 1 (the whole JWT)", len(relaxed))
+	}
+	if relaxed[0].Token.Raw != tok {
+		t.Errorf("relaxed token = %q, want the full JWT", relaxed[0].Token.Raw)
+	}
+	if iss, _ := relaxed[0].Token.Issuer(); iss != "acme" {
+		t.Errorf("relaxed JWT lost its claims: iss=%q", iss)
+	}
+}
+
+func TestFindRelaxedBarePayload(t *testing.T) {
+	// A lone base64url JSON object (no JWT envelope) is found only in relaxed mode.
+	enc := base64.RawURLEncoding
+	payload := enc.EncodeToString([]byte(`{"iss":"acme","sub":"solo"}`))
+	blob := "cookie=" + payload + ";"
+
+	if strict := Find("x", []byte(blob)); len(strict) != 0 {
+		t.Errorf("strict Find should not match a bare payload, got %d", len(strict))
+	}
+
+	relaxed := FindRelaxed("x", []byte(blob))
+	if len(relaxed) != 1 {
+		t.Fatalf("relaxed found %d, want 1", len(relaxed))
+	}
+	tok := relaxed[0].Token
+	if tok.Raw != payload {
+		t.Errorf("Raw = %q, want %q", tok.Raw, payload)
+	}
+	if tok.Header != nil {
+		t.Errorf("bare object should have no header, got %v", tok.Header)
+	}
+	if iss, ok := tok.Issuer(); !ok || iss != "acme" {
+		t.Errorf("bare object claims wrong: iss=%q,%v", iss, ok)
+	}
+	// Offset must point at the payload within the blob.
+	if blob[relaxed[0].Offset:relaxed[0].Offset+len(payload)] != payload {
+		t.Errorf("offset %d does not point at the payload", relaxed[0].Offset)
+	}
+}
+
+func TestFindRelaxedSignatureless(t *testing.T) {
+	// A two-segment header.payload (no signature) is not a valid JWT, so relaxed
+	// mode decodes each segment; the payload object must surface.
+	enc := base64.RawURLEncoding
+	h := enc.EncodeToString([]byte(`{"alg":"HS256"}`))
+	p := enc.EncodeToString([]byte(`{"sub":"halfbaked"}`))
+	blob := h + "." + p
+
+	if strict := Find("x", []byte(blob)); len(strict) != 0 {
+		t.Errorf("strict Find should skip a 2-segment token, got %d", len(strict))
+	}
+	relaxed := FindRelaxed("x", []byte(blob))
+	var subs []string
+	for _, loc := range relaxed {
+		if sub, ok := loc.Token.Subject(); ok {
+			subs = append(subs, sub)
+		}
+	}
+	if len(subs) != 1 || subs[0] != "halfbaked" {
+		t.Errorf("relaxed subjects = %v, want [halfbaked]", subs)
+	}
+}
+
+func TestFindRelaxedRejectsNonJSON(t *testing.T) {
+	// "eyJ"-prefixed runs that do not base64url-decode to JSON objects are still
+	// dropped, even in relaxed mode.
+	if found := FindRelaxed("x", []byte("eyJabc eyJ.x.y notatoken")); len(found) != 0 {
+		t.Errorf("relaxed found %d false positives: %+v", len(found), found)
+	}
+}
+
 func TestFindStreamMatchesFind(t *testing.T) {
 	// FindStream over a reader must report the same tokens and the same global
 	// offsets as Find over the whole buffer.
@@ -70,7 +150,7 @@ func TestFindStreamMatchesFind(t *testing.T) {
 	want := Find("<stream>", []byte(blob))
 
 	var got []Located
-	if err := FindStream("<stream>", strings.NewReader(blob), func(l Located) {
+	if err := FindStream("<stream>", strings.NewReader(blob), Find, func(l Located) {
 		got = append(got, l)
 	}); err != nil {
 		t.Fatalf("FindStream: %v", err)
@@ -102,7 +182,7 @@ func TestFindStreamIsIncremental(t *testing.T) {
 
 	done := make(chan Located, 1)
 	go func() {
-		_ = FindStream("x", r, func(l Located) {
+		_ = FindStream("x", r, Find, func(l Located) {
 			select {
 			case done <- l:
 			default:

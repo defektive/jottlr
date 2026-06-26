@@ -255,6 +255,34 @@ func TestOnlyMatching(t *testing.T) {
 	}
 }
 
+func TestRelaxedMode(t *testing.T) {
+	enc := base64.RawURLEncoding
+	bare := enc.EncodeToString([]byte(`{"iss":"acme","sub":"solo"}`))
+	stdin := "set-cookie: session=" + bare + "; Path=/\n"
+
+	// Strict mode: a bare payload is not a JWT, so no match (exit 1).
+	out, _, code := jottlr(t, stdin, "-get", "sub")
+	if code != 1 || strings.TrimSpace(out) != "" {
+		t.Errorf("strict: out=%q code=%d, want empty/1", out, code)
+	}
+
+	// Relaxed mode: the base64url JSON object is found and filterable.
+	out, _, code = jottlr(t, stdin, "-relaxed", "-iss", "acme", "-get", "sub")
+	if code != 0 {
+		t.Fatalf("relaxed exit = %d", code)
+	}
+	if strings.TrimSpace(out) != "solo" {
+		t.Errorf("relaxed -get sub = %q, want solo", out)
+	}
+
+	// A real JWT is still reported once in relaxed mode (not split into segments).
+	tok := mkJWT(hdr(), map[string]any{"sub": "whole"})
+	out, _, _ = jottlr(t, tok+"\n", "-relaxed", "-o")
+	if strings.TrimSpace(out) != tok {
+		t.Errorf("relaxed -o on a real JWT = %q, want the whole token", out)
+	}
+}
+
 func TestStreamEmptyJSONArray(t *testing.T) {
 	// -json with no matches must still emit a valid empty array.
 	out, _, code := jottlr(t, "no tokens here\n", "-json")

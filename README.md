@@ -59,6 +59,18 @@ jottlr -r ./captures
 
 Filters are ANDed together. A bare `jottlr` (no filters) matches every token.
 
+**Relaxed mode** (`-relaxed`) widens the search to *any* base64url-encoded JSON
+object, not just well-formed JWTs — useful for bare payloads, signature-less
+tokens, or JSON stuffed into a cookie. It is a strict superset: a real JWT is
+still reported once (header + claims + signature), while other base64url JSON is
+surfaced as a header-less token (its decoded object becomes the claims, so the
+same `-iss`/`-claim`/`-get` filters apply).
+
+```sh
+# A bare base64url JSON object in a cookie that strict mode would ignore.
+jottlr -relaxed -iss 'accounts\.example' -get sub < cookies.txt
+```
+
 ```sh
 # Live tokens issued by our accounts service — print the subject of each.
 jottlr -not-expired -iss 'accounts\.example\.com$' -get sub < tokens.txt

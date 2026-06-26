@@ -56,6 +56,7 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 		get    = fs.String("get", "", "print only this dotted field (jq-style), e.g. iss, header.alg, realm_access.roles")
 
 		// Search / rendering.
+		relaxed   = fs.Bool("relaxed", false, "match any base64url-encoded JSON object, not just well-formed JWTs (catches bare payloads and signature-less tokens)")
 		recursive = fs.Bool("r", false, "recurse into subdirectories when a path is a directory")
 		jobs      = fs.Int("jobs", 0, "files to scan in parallel during a directory walk (0 = number of CPUs)")
 		colorWhen = fs.String("color", "auto", "highlight the token in raw output: always, never, or auto (terminal only)")
@@ -100,16 +101,21 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 		emitErr = out.Emit(loc)
 	}
 
+	finder := jwt.Finder(jwt.Find)
+	if *relaxed {
+		finder = jwt.FindRelaxed
+	}
+
 	if len(paths) == 0 {
 		// No paths: stream stdin so jottlr works on unbounded pipes.
-		if err := jwt.FindStream("<stdin>", stdin, emit); err != nil && emitErr == nil {
+		if err := jwt.FindStream("<stdin>", stdin, finder, emit); err != nil && emitErr == nil {
 			fmt.Fprintln(stderr, "jottlr:", err)
 			return 2
 		}
 	}
 	for _, p := range paths {
 		located, errs := scan.WalkFiles(p, *jobs, *recursive, func(path string, data []byte) ([]jwt.Located, error) {
-			return jwt.Find(path, data), nil
+			return finder(path, data), nil
 		})
 		for _, e := range errs {
 			fmt.Fprintln(stderr, "jottlr:", e)

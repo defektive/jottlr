@@ -24,6 +24,16 @@ three dot-separated base64url segments around `eyJ`, then every candidate is
 real base64url JSON objects. Anchor = speed; decode = near-zero false positives.
 The signature segment may be empty (`alg=none` → `header.payload.`).
 
+**Relaxed mode** (`-relaxed` → `jwt.FindRelaxed`) widens this to any base64url
+JSON object. It is a **strict superset** of `Find`: a run that `Parse`s as a real
+3-segment JWT is emitted once as that JWT; otherwise each dot-separated segment
+is decoded independently and every base64url-JSON segment becomes a header-less
+`Token` (decoded object in `Claims`, `Header == nil`). Don't "fix" relaxed mode
+to also split real JWTs into their header/payload — the Parse-first branch is
+what keeps a genuine JWT a single result. `Find`/`FindRelaxed` both satisfy the
+`jwt.Finder` type, which is how `FindStream` and the file walker stay mode-
+agnostic.
+
 ## Reuse from base-grep (important architectural decision)
 
 The content-agnostic grep machinery — bounded-parallel file/dir walk, line
@@ -52,7 +62,7 @@ main.go              CLI: flags, buildFilter, parseTime, orchestration
 render.go            output modes (raw / -decode / -json / -get) + renderLine
 jwt/                 the JWT library (public, reusable, no CLI deps)
   jwt.go             Token, Parse, claim accessors, expiry/time helpers
-  find.go            Find(source, data) []Located + FindStream (line-buffered)
+  find.go            Find / FindRelaxed / FindStream (Finder type, line-buffered)
   filter.go          Filter (predicate conjunction) + jq-style Extract
 integration_test.go  builds the real binary, drives it over stdin/files/dirs
 render_test.go       unit tests for renderLine / formatValue / buildFilter
@@ -68,6 +78,8 @@ render_test.go       unit tests for renderLine / formatValue / buildFilter
   values and `-claim ver=2` comparisons don't suffer float rounding.
 - **`aud` is normalised** to `[]string` (JWT allows string *or* array).
 - **JSON output disables HTML escaping** so `<stdin>` and URLs print literally.
+- **`Header` is `omitempty`** in `-json`/`-decode` output so relaxed-mode bare
+  objects (no JOSE header) don't print a noisy `"header": null`.
 - **Exit codes follow grep**: 0 = match, 1 = no match, 2 = usage/IO error.
 - **Output ordering** is deterministic: stream matches in encounter order, file/
   dir matches sorted by path then offset (via `scan.WalkFiles`).

@@ -33,21 +33,23 @@ type outputMode struct {
 	get    string
 }
 
-// jsonToken is the structured representation emitted by -json.
+// jsonToken is the structured representation emitted by -json. Header is omitted
+// for relaxed-mode bare objects, which have no JOSE header.
 type jsonToken struct {
 	Source string         `json:"source"`
 	Offset int            `json:"offset"`
 	Raw    string         `json:"raw"`
-	Header map[string]any `json:"header"`
+	Header map[string]any `json:"header,omitempty"`
 	Claims map[string]any `json:"claims"`
 }
 
 // decodeView is the per-token object printed by -decode: the decoded values,
-// tagged with where the token was found.
+// tagged with where the token was found. Header is omitted for relaxed-mode bare
+// objects.
 type decodeView struct {
 	Source string         `json:"source"`
 	Offset int            `json:"offset"`
-	Header map[string]any `json:"header"`
+	Header map[string]any `json:"header,omitempty"`
 	Claims map[string]any `json:"claims"`
 }
 

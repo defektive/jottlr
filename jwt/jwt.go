@@ -71,6 +71,18 @@ func decodeSegment(seg string) ([]byte, error) {
 	return base64.RawURLEncoding.DecodeString(seg)
 }
 
+// parseObjectSegment base64url-decodes a single segment and unmarshals it as a
+// JSON object. It is the relaxed-mode building block: a JWT segment (or any
+// stray base64url blob) that decodes to a JSON object becomes a header-less
+// token. A segment that is not base64url, or not a JSON object, yields an error.
+func parseObjectSegment(seg string) (map[string]any, error) {
+	raw, err := decodeSegment(seg)
+	if err != nil {
+		return nil, err
+	}
+	return decodeObject(raw)
+}
+
 // decodeObject unmarshals data as a JSON object, keeping numbers as json.Number
 // so large NumericDate values survive without float rounding. A JSON value that
 // is not an object (array, string, ...) is rejected — a real JWT header and
