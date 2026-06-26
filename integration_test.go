@@ -238,6 +238,23 @@ func TestStreamManyLines(t *testing.T) {
 	}
 }
 
+func TestOnlyMatching(t *testing.T) {
+	a := mkJWT(hdr(), map[string]any{"sub": "a"})
+	b := mkJWT(hdr(), map[string]any{"sub": "b"})
+	stdin := "Authorization: Bearer " + a + " trailing junk\nnoise\nx=" + b + "\n"
+
+	out, _, code := jottlr(t, stdin, "-o")
+	if code != 0 {
+		t.Fatalf("exit = %d", code)
+	}
+	// Output must be exactly the two bare tokens, one per line — no surrounding
+	// text, no source:offset prefix.
+	want := a + "\n" + b + "\n"
+	if out != want {
+		t.Errorf("-o output = %q, want %q", out, want)
+	}
+}
+
 func TestStreamEmptyJSONArray(t *testing.T) {
 	// -json with no matches must still emit a valid empty array.
 	out, _, code := jottlr(t, "no tokens here\n", "-json")

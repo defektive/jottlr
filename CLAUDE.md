@@ -7,8 +7,8 @@ Guidance for working in this repo. Read this first.
 `jottlr` (soft *j*, "yaat-ler") is a Go CLI — **jq for JWTs**. It finds JSON Web
 Tokens in input streams, files or directories and filters them by their decoded
 contents (issuer pattern, not-expired, alg, arbitrary claim equality, ...). It
-can print the raw token grep-style, the decoded header/claims, a JSON dump, or a
-single jq-style field.
+can print the raw token grep-style, just the bare token (`-o`, like `grep -o`),
+the decoded header/claims, a JSON dump, or a single jq-style field.
 
 Module path: `github.com/defektive/jottlr`. Go 1.26. **Reader, not validator:**
 jottlr decodes but **never verifies signatures**. Every claim it surfaces is

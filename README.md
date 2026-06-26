@@ -74,6 +74,11 @@ jottlr -claim admin=true -has exp access.log
 
 - **(default)** raw token, grep-style: `source:offset: <line>` with the token
   highlighted (`-color auto|always|never`, `-max-columns N`).
+- `-o` — print **only** the matched token, one per line (no surrounding line, no
+  `source:offset:` prefix). Like `grep -o`; ideal for piping tokens onward:
+  ```sh
+  jottlr -o -not-expired access.log | while read t; do inspect "$t"; done
+  ```
 - `-decode` — pretty-print the decoded `header` and `claims` (tagged with where
   the token was found).
 - `-json` — emit all matching tokens as a JSON array (`source`, `offset`,

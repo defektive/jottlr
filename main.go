@@ -50,6 +50,7 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 		claimEq    stringList
 
 		// Output.
+		only   = fs.Bool("o", false, "print only the matched token, one per line (not the whole line)")
 		decode = fs.Bool("decode", false, "print the decoded header and claims instead of the raw token")
 		jsonO  = fs.Bool("json", false, "emit matching tokens as a JSON array (source, offset, header, claims)")
 		get    = fs.String("get", "", "print only this dotted field (jq-style), e.g. iss, header.alg, realm_access.roles")
@@ -87,7 +88,7 @@ func run(args []string, stdin *os.File, stdout, stderr *os.File) int {
 
 	paths := fs.Args()
 
-	out := newSink(stdout, outputMode{decode: *decode, json: *jsonO, get: *get}, useColor, *maxCols)
+	out := newSink(stdout, outputMode{only: *only, decode: *decode, json: *jsonO, get: *get}, useColor, *maxCols)
 
 	// emit applies the filter and renders matching tokens incrementally, so the
 	// whole input never has to be buffered. A write error aborts the run.

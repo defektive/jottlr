@@ -23,9 +23,11 @@ func marshalIndent(v any) ([]byte, error) {
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
-// outputMode selects how matching tokens are printed. At most one of decode,
-// json or get applies; otherwise the default grep-like raw line is used.
+// outputMode selects how matching tokens are printed. At most one of get, json,
+// decode or only applies (in that precedence); otherwise the default grep-like
+// raw line is used.
 type outputMode struct {
+	only   bool
 	decode bool
 	json   bool
 	get    string
@@ -106,6 +108,12 @@ func (s *sink) Emit(loc jwt.Located) error {
 			return err
 		}
 		fmt.Fprintf(s.w, "%s\n", b)
+	case s.mode.only:
+		tok := loc.Token.Raw
+		if s.color {
+			tok = scan.HiOn + tok + scan.HiOff
+		}
+		fmt.Fprintln(s.w, tok)
 	default:
 		fmt.Fprintf(s.w, "%s:%d: %s\n", loc.Source, loc.Offset, renderLine(loc, s.color, s.maxCols))
 	}
