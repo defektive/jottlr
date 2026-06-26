@@ -1,0 +1,36 @@
+# Compiled binaries
+/jottlr
+jottlr
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and profiling output
+*.test
+*.out
+coverage.out
+coverage.html
+cpu.prof
+mem.prof
+
+# Go workspace / vendor
+/vendor/
+go.work
+go.work.sum
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Scratch / local data
+/tmp/
+*.log
